@@ -1,4 +1,5 @@
-# Animation Encoder
+# Animation Encoder in 2023
+
 ## Overview
 anim_encoder creates small JavaScript+HTML animations from a series on PNG images.
 This is a modification of that original post, that adds some actual documentation

@@ -24,16 +24,18 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import scipy.ndimage.measurements as me
+import scipy.ndimage as me
 import json
-import scipy.misc as misc
+import imageio.v2 as imageio
 import re
 import sys
 import os
 import cv2
 import hashlib
+import shutil
 from numpy import *
 from time import time
+from subprocess import DEVNULL, STDOUT, check_call
 
 # How long to wait before the animation restarts
 END_FRAME_PAUSE = 4000
@@ -158,12 +160,16 @@ def generate_animation(anim_name):
             continue
         last_sha256 = sha256
 
-        im = misc.imread(f)
+        im = imageio.imread(f)
         # Remove alpha channel from image
         if im.shape[2] == 4:
             im = im[:,:,:3]
         images.append(im)
         times.append(t)
+
+    if not images:
+        print(f"No images found in \"{anim_name}\"")
+        return
 
     zero = images[0] - images[0]
     pairs = zip([zero] + images[:-1], images)
@@ -222,19 +228,24 @@ def generate_animation(anim_name):
 
     packed = packed[0:allocator.num_used_rows]
 
-    misc.imsave(anim_name + "_packed_tmp.png", packed)
+    packed_file = f"{anim_name}_packed.png"
+    imageio.imsave(packed_file, packed)
+
     # Don't completely fail if we don't have pngcrush
-    if os.system("pngcrush -q " + anim_name + "_packed_tmp.png " + anim_name + "_packed.png") == 0:
-        os.system("rm " + anim_name + "_packed_tmp.png")
-    else:
+    crush_file = f"{anim_name}_crush.png"
+    try:
+        check_call(["pngcrush", "-q", packed_file, crush_file], stdout=DEVNULL, stderr=STDOUT)
+        shutil.move(crush_file, packed_file)
+    except FileNotFoundError:
         print("pngcrush not found, unable to reduce filesize")
-        os.system("mv " + anim_name + "_packed_tmp.png " + anim_name + "_packed.png")
 
     # Try to use pngquant since it can significantly reduce filesize for screencasts
     # that don't include photos or other sources of many different colors
-    if os.system("pngquant -o " + anim_name + "_quant.png " + anim_name + "_packed.png") == 0:
-        os.system("mv " + anim_name + "_quant.png " + anim_name + "_packed.png")
-    else:
+    quant_file = f"{anim_name}_quant.png"
+    try:
+        check_call(["pngquant", "-o", quant_file, packed_file], stdout=DEVNULL, stderr=STDOUT)
+        shutil.move(quant_file, packed_file)
+    except FileNotFoundError:
         print("pngquant not found, unable to reduce filesize")
 
     # Generate JSON to represent the data

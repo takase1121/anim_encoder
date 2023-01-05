@@ -5,24 +5,37 @@
 # with their corresponding timestamps. (Borrowed from stackoverflow).
 # This will continue to capture for the seconds specified by argv[1]
 
-import gtk.gdk
+import gi
+gi.require_version('Gtk', '3.0')
+gi.require_version('Gdk', '3.0')
+from gi.repository import Gdk, GdkPixbuf, Gtk
+
 import time
 import sys
 import config
 
+print("Starting Capture")
+print("================")
 
-print "Starting Capture"
-print "================"
+time.sleep(config.CAPTURE_STARTUP_DELAY)
 
-w = gtk.gdk.get_default_root_window()
-sz = w.get_size()
 
-for i in xrange(0, config.CAPTURE_NUM):
-  pb = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB,False,8,sz[0],sz[1])
-  pb = pb.get_from_drawable(w,w.get_colormap(),0,0,0,0,sz[0],sz[1])
-  if (pb != None):
-    pb.save("capture/screenshot_"+ str(int(time.time())) +".png","png")
-    print "Screenshot " + str(i) + " saved."
+root_w = Gdk.get_default_root_window()
+w = root_w.get_screen().get_active_window()
+x, y, width, height = w.get_geometry()
+
+for i in range(0, config.CAPTURE_NUM):
+  root_w.process_all_updates()
+  root_w.flush()
+  w.invalidate_rect(None, True)
+  root_w.invalidate_rect(None, True)
+
+  pb = Gdk.pixbuf_get_from_window(w, 0, 0, width, height)
+
+  if (pb is not None):
+    pb.savev(f"capture/screenshot_{time.time()}.png", "png", [], [])
+    print(f"Screenshot {i} saved.")
   else:
-    print "Unable to get the screenshot."
+    print("Unable to get the screenshot.")
+  pb.fill(0xFFFFFFFF)
   time.sleep(config.CAPTURE_DELAY)
